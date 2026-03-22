@@ -1,0 +1,862 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="theme-color" content="#6B2D8B">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <title>파츠 트래커</title>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','Noto Sans KR',sans-serif;background:#f0f2f5;min-height:100vh;-webkit-tap-highlight-color:transparent}
+    input,select,button,textarea{font-family:inherit}
+    button{cursor:pointer}
+    .screen{display:none}.screen.active{display:block}
+    .tag-out{background:#ffebee;color:#c62828;padding:3px 10px;border-radius:20px;font-size:12px;font-weight:700;display:inline-block}
+    .tag-in{background:#e8f5e9;color:#2e7d32;padding:3px 10px;border-radius:20px;font-size:12px;font-weight:700;display:inline-block}
+    .form-label{display:block;margin-bottom:8px;font-size:13px;font-weight:700;color:#555}
+    .form-input{width:100%;padding:14px 16px;font-size:16px;border:2px solid #e8e8e8;border-radius:12px;outline:none;background:white}
+    .form-input:focus{border-color:#6B2D8B}
+  </style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="screen-login" class="screen active">
+  <div style="min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;background:linear-gradient(160deg,#4A1D6E 0%,#6B2D8B 50%,#7A2D9A 100%);padding:20px;">
+    <div style="background:white;border-radius:20px;padding:36px 28px;width:100%;max-width:380px;box-shadow:0 20px 60px rgba(0,0,0,0.4);">
+      <div style="text-align:center;margin-bottom:36px;">
+        <div style="width:72px;height:72px;background:linear-gradient(135deg,#6B2D8B,#8B44AA);border-radius:20px;display:flex;align-items:center;justify-content:center;margin:0 auto 16px;font-size:36px;box-shadow:0 8px 24px rgba(107,45,139,0.3);">🔧</div>
+        <h1 style="font-size:24px;font-weight:800;color:#6B2D8B;margin-bottom:4px;">파츠 트래커</h1>
+        <p style="color:#888;font-size:14px;">스페어파츠 출입고 관리 시스템</p>
+      </div>
+      <div style="margin-bottom:16px;">
+        <label class="form-label">이름 선택</label>
+        <div style="position:relative;">
+          <select id="login-name" class="form-input" style="appearance:none;-webkit-appearance:none;cursor:pointer;">
+            <option value="">-- 이름을 선택하세요 --</option>
+          </select>
+          <span style="position:absolute;right:14px;top:50%;transform:translateY(-50%);pointer-events:none;color:#888;font-size:12px;">▼</span>
+        </div>
+      </div>
+      <div id="pw-wrap" style="display:none;margin-bottom:28px;">
+        <label class="form-label">관리자 비밀번호</label>
+        <input id="login-pw" type="password" class="form-input" placeholder="비밀번호 입력" inputmode="numeric" style="text-align:center;letter-spacing:8px;font-size:20px;">
+      </div>
+      <div id="login-err" style="display:none;background:#fff3f3;border:1px solid #ffcdd2;color:#c62828;padding:12px 16px;border-radius:10px;margin-bottom:16px;font-size:14px;text-align:center;"></div>
+      <button onclick="doLogin()" style="width:100%;padding:16px;font-size:17px;font-weight:700;background:linear-gradient(135deg,#6B2D8B,#8B44AA);color:white;border:none;border-radius:12px;box-shadow:0 4px 16px rgba(107,45,139,0.3);">로그인</button>
+    </div>
+    <p style="color:rgba(255,255,255,0.3);font-size:12px;margin-top:24px;">Parts Tracker v1.2</p>
+  </div>
+</div>
+
+<!-- EMPLOYEE -->
+<div id="screen-employee" class="screen">
+  <div style="background:linear-gradient(135deg,#6B2D8B,#8B44AA);color:white;padding:20px 16px 24px;position:sticky;top:0;z-index:50;box-shadow:0 2px 12px rgba(107,45,139,0.3);">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px;">
+      <div>
+        <div style="font-size:13px;opacity:0.7;margin-bottom:2px;">안녕하세요 👋</div>
+        <div id="emp-name" style="font-size:22px;font-weight:800;"></div>
+        <div id="emp-wh" style="display:inline-block;background:rgba(255,255,255,0.2);border-radius:20px;padding:4px 12px;font-size:13px;margin-top:6px;"></div>
+      </div>
+      <button onclick="doLogout()" style="background:rgba(255,255,255,0.15);color:white;border:none;border-radius:10px;padding:8px 16px;font-size:13px;font-weight:600;">로그아웃</button>
+    </div>
+    <div style="background:rgba(255,255,255,0.15);border-radius:12px;padding:12px 16px;display:flex;align-items:center;gap:12px;">
+      <div id="today-cnt" style="font-size:28px;font-weight:800;">0</div>
+      <div style="font-size:14px;opacity:0.9;">오늘 불출한 총 부품 수량 (개)</div>
+    </div>
+  </div>
+  <div style="padding:16px;padding-bottom:96px;">
+    <button onclick="openForm()" style="width:100%;padding:22px;font-size:20px;font-weight:800;background:linear-gradient(135deg,#6B2D8B,#8B44AA);color:white;border:none;border-radius:20px;margin-bottom:24px;box-shadow:0 8px 24px rgba(107,45,139,0.35);">＋ 새 출입고 기록</button>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+      <h2 style="font-size:16px;font-weight:700;color:#333;">최근 기록</h2>
+      <button onclick="loadEmpTx()" style="background:none;border:none;color:#6B2D8B;font-size:13px;font-weight:600;">🔄 새로고침</button>
+    </div>
+    <div id="emp-list"><div style="text-align:center;padding:60px;color:#999;"><div style="font-size:36px;margin-bottom:12px;">⏳</div>불러오는 중...</div></div>
+  </div>
+  <button onclick="openForm()" style="position:fixed;bottom:24px;right:20px;width:60px;height:60px;border-radius:50%;background:linear-gradient(135deg,#ef5350,#e53935);color:white;border:none;font-size:28px;box-shadow:0 6px 20px rgba(239,83,80,0.5);z-index:40;display:flex;align-items:center;justify-content:center;">＋</button>
+</div>
+
+<!-- ADMIN -->
+<div id="screen-admin" class="screen">
+  <div style="background:linear-gradient(135deg,#6B2D8B,#7A2D9A);color:white;padding:20px 16px;box-shadow:0 2px 12px rgba(107,45,139,0.3);">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+      <div>
+        <div style="font-size:13px;opacity:0.7;">🛠 관리자</div>
+        <div style="font-size:20px;font-weight:800;">파츠 트래커 대시보드</div>
+      </div>
+      <button onclick="doLogout()" style="background:rgba(255,255,255,0.15);color:white;border:none;border-radius:10px;padding:8px 16px;font-size:13px;font-weight:600;">로그아웃</button>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;">
+      <div id="stat-today" style="background:rgba(255,255,255,0.15);border-radius:12px;padding:10px;text-align:center;"><div style="font-size:24px;font-weight:800;">-</div><div style="font-size:11px;opacity:0.75;">오늘 건수</div></div>
+      <div id="stat-week"  style="background:rgba(255,255,255,0.15);border-radius:12px;padding:10px;text-align:center;"><div style="font-size:24px;font-weight:800;">-</div><div style="font-size:11px;opacity:0.75;">이번 주</div></div>
+      <div id="stat-miss"  style="background:rgba(255,255,255,0.15);border-radius:12px;padding:10px;text-align:center;"><div style="font-size:24px;font-weight:800;">-</div><div style="font-size:11px;opacity:0.75;">미제출 인원</div></div>
+    </div>
+  </div>
+  <div style="display:flex;background:white;border-bottom:1px solid #e8e8e8;overflow-x:auto;">
+    <button id="tb-list"  onclick="switchTab('list')"  style="flex:1;min-width:80px;padding:14px 8px;font-size:13px;font-weight:700;border:none;border-bottom:3px solid #6B2D8B;background:white;color:#6B2D8B;white-space:nowrap;">📋 기록</button>
+    <button id="tb-stats" onclick="switchTab('stats')" style="flex:1;min-width:80px;padding:14px 8px;font-size:13px;font-weight:700;border:none;border-bottom:3px solid transparent;background:#fafafa;color:#999;white-space:nowrap;">📊 현황</button>
+    <button id="tb-emp"   onclick="switchTab('emp')"   style="flex:1;min-width:80px;padding:14px 8px;font-size:13px;font-weight:700;border:none;border-bottom:3px solid transparent;background:#fafafa;color:#999;white-space:nowrap;">👥 직원관리</button>
+  </div>
+  <div style="padding:16px;padding-bottom:40px;">
+
+    <!-- LIST -->
+    <div id="tab-list">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px;">
+        <button onclick="exportWeekly()" style="padding:14px 12px;background:#2e7d32;color:white;border:none;border-radius:14px;text-align:left;">
+          <div style="font-size:15px;font-weight:700;">📊 주간 Excel</div>
+          <div id="wk-cnt" style="font-size:12px;opacity:0.8;margin-top:2px;">- 건 다운로드</div>
+        </button>
+        <button onclick="exportFiltered()" style="padding:14px 12px;background:#7B3BA0;color:white;border:none;border-radius:14px;text-align:left;">
+          <div style="font-size:15px;font-weight:700;">📋 필터 결과</div>
+          <div id="fl-cnt" style="font-size:12px;opacity:0.8;margin-top:2px;">- 건 다운로드</div>
+        </button>
+      </div>
+      <div style="background:white;border-radius:16px;padding:16px;margin-bottom:16px;box-shadow:0 2px 8px rgba(0,0,0,0.06);">
+        <div style="font-size:14px;font-weight:700;color:#333;margin-bottom:12px;">🔍 필터</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+          <select id="f-emp" onchange="applyFilters()" style="padding:10px 12px;border:1.5px solid #e8e8e8;border-radius:10px;font-size:14px;background:white;outline:none;"><option value="">전체 직원</option></select>
+          <select id="f-type" onchange="applyFilters()" style="padding:10px 12px;border:1.5px solid #e8e8e8;border-radius:10px;font-size:14px;background:white;outline:none;">
+            <option value="">입출고 전체</option><option value="out">📤 출고만</option><option value="in">📥 입고만</option>
+          </select>
+          <input type="date" id="f-from" onchange="applyFilters()" style="padding:10px 12px;border:1.5px solid #e8e8e8;border-radius:10px;font-size:14px;outline:none;">
+          <input type="date" id="f-to"   onchange="applyFilters()" style="padding:10px 12px;border:1.5px solid #e8e8e8;border-radius:10px;font-size:14px;outline:none;">
+        </div>
+        <button onclick="clearFilters()" style="margin-top:10px;padding:8px 16px;background:#fff3f3;color:#c62828;border:1px solid #ffcdd2;border-radius:8px;font-size:13px;font-weight:600;">✕ 필터 초기화</button>
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+        <div id="res-cnt" style="font-size:14px;color:#666;font-weight:600;">총 0건</div>
+        <button onclick="loadAdminTx()" style="background:none;border:none;color:#6B2D8B;font-size:13px;font-weight:600;">🔄 새로고침</button>
+      </div>
+      <div id="admin-list"></div>
+    </div>
+
+    <!-- STATS -->
+    <div id="tab-stats" style="display:none;">
+      <div id="miss-alert" style="display:none;background:#fff8e1;border:1px solid #ffe082;border-radius:16px;padding:16px;margin-bottom:16px;">
+        <div id="miss-title" style="font-size:14px;font-weight:700;color:#f57f17;margin-bottom:10px;">⚠️ 오늘 미기록 인원</div>
+        <div id="miss-list" style="display:flex;flex-wrap:wrap;gap:8px;"></div>
+      </div>
+      <div style="font-size:14px;font-weight:700;color:#333;margin-bottom:12px;">이번 주 직원별 활동</div>
+      <div id="emp-stats"></div>
+    </div>
+
+    <!-- EMPLOYEE MANAGEMENT -->
+    <div id="tab-emp" style="display:none;">
+      <div style="background:white;border-radius:16px;padding:20px;margin-bottom:16px;box-shadow:0 2px 8px rgba(0,0,0,0.06);">
+        <div style="font-size:16px;font-weight:700;color:#333;margin-bottom:16px;">➕ 직원 추가</div>
+        <div style="margin-bottom:12px;">
+          <label class="form-label">이름</label>
+          <input id="new-emp-name" type="text" class="form-input" placeholder="예: 홍길동">
+        </div>
+        <div style="margin-bottom:16px;">
+          <label class="form-label">창고번호</label>
+          <input id="new-emp-wh" type="text" class="form-input" placeholder="예: SP60_15" style="text-transform:uppercase;">
+        </div>
+        <div id="add-emp-err" style="display:none;background:#ffebee;color:#c62828;padding:10px 14px;border-radius:10px;margin-bottom:12px;font-size:14px;"></div>
+        <div id="add-emp-ok" style="display:none;background:#e8f5e9;color:#2e7d32;padding:10px 14px;border-radius:10px;margin-bottom:12px;font-size:14px;font-weight:600;"></div>
+        <button id="btn-add-emp" onclick="addEmployee()" style="width:100%;padding:14px;font-size:16px;font-weight:700;background:linear-gradient(135deg,#6B2D8B,#8B44AA);color:white;border:none;border-radius:12px;">직원 추가</button>
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+        <div style="font-size:16px;font-weight:700;color:#333;">👥 직원 목록 (<span id="emp-cnt">0</span>명)</div>
+        <button onclick="loadEmployees()" style="background:none;border:none;color:#6B2D8B;font-size:13px;font-weight:600;">🔄 새로고침</button>
+      </div>
+      <div id="emp-mgmt-list"></div>
+    </div>
+
+  </div>
+</div>
+
+<!-- FORM MODAL -->
+<div id="form-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:100;align-items:flex-end;">
+  <div style="background:#f8f9fa;border-radius:24px 24px 0 0;width:100%;max-height:92vh;overflow-y:auto;">
+    <div style="display:flex;justify-content:center;padding:12px 0 0;"><div style="width:40px;height:4px;background:#ddd;border-radius:2px;"></div></div>
+    <div style="padding:16px 20px 48px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:24px;">
+        <h2 style="font-size:20px;font-weight:800;color:#1a1a1a;">출입고 기록</h2>
+        <button onclick="closeForm()" style="background:#f0f0f0;border:none;border-radius:50%;width:36px;height:36px;font-size:18px;display:flex;align-items:center;justify-content:center;">✕</button>
+      </div>
+      <div id="form-ok" style="display:none;background:#e8f5e9;border:2px solid #43a047;border-radius:16px;padding:40px 32px;text-align:center;">
+        <div style="font-size:56px;margin-bottom:12px;">✅</div>
+        <div id="form-ok-msg" style="font-size:20px;font-weight:700;color:#2e7d32;">저장 완료!</div>
+      </div>
+      <div id="form-body">
+        <div style="display:flex;border-radius:16px;overflow:hidden;margin-bottom:24px;border:2px solid #e0e0e0;background:white;">
+          <button id="btn-out" onclick="setType('out')" style="flex:1;padding:16px;font-size:17px;font-weight:700;border:none;background:#ef5350;color:white;">📤 출고</button>
+          <button id="btn-in"  onclick="setType('in')"  style="flex:1;padding:16px;font-size:17px;font-weight:700;border:none;background:white;color:#999;">📥 입고</button>
+        </div>
+        <div style="margin-bottom:16px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+            <label class="form-label" style="margin:0;">부품 목록 *</label>
+            <button id="btn-add-part" onclick="addPartRow()" style="padding:8px 16px;background:linear-gradient(135deg,#6B2D8B,#8B44AA);color:white;border:none;border-radius:10px;font-size:14px;font-weight:700;">＋ 부품 추가</button>
+          </div>
+          <div id="parts-list"></div>
+        </div>
+        <div style="margin-bottom:20px;">
+          <label class="form-label">비고 (선택)</label>
+          <input id="f-note" type="text" class="form-input" placeholder="메모 입력...">
+        </div>
+        <div id="f-info" style="background:#f3e5f5;border-radius:12px;padding:14px 16px;margin-bottom:20px;font-size:14px;"></div>
+        <div id="f-err" style="display:none;background:#ffebee;color:#c62828;padding:12px 16px;border-radius:10px;margin-bottom:16px;font-size:14px;text-align:center;"></div>
+        <button id="f-submit" onclick="submitForm()" style="width:100%;padding:18px;font-size:18px;font-weight:800;background:linear-gradient(135deg,#ef5350,#e53935);color:white;border:none;border-radius:16px;">📤 출고 기록 저장</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- SCANNER MODAL -->
+<div id="scan-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.96);z-index:9999;flex-direction:column;align-items:center;justify-content:center;padding:20px;">
+  <div style="color:white;font-size:18px;font-weight:700;margin-bottom:24px;text-align:center;">📷 바코드 스캔</div>
+  <div id="qr-reader" style="width:300px;border-radius:12px;overflow:hidden;background:#111;min-height:200px;"></div>
+  <p style="color:rgba(255,255,255,0.6);font-size:13px;margin-top:16px;text-align:center;line-height:1.6;">바코드를 카메라 앞에 가져다 대세요<br><small style="opacity:0.7;">HTTPS 환경에서만 작동합니다</small></p>
+  <div id="scan-err" style="display:none;background:#fff3f3;border:1px solid #ff5252;color:#c62828;padding:16px 20px;border-radius:12px;font-size:14px;text-align:center;max-width:280px;margin-top:16px;line-height:1.5;"></div>
+  <button onclick="closeScanner()" style="margin-top:32px;padding:14px 48px;background:#ef5350;color:white;border:none;border-radius:12px;font-size:16px;font-weight:700;">취소</button>
+</div>
+
+<!-- EDIT MODAL -->
+<div id="edit-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:100;align-items:flex-end;">
+  <div style="background:#f8f9fa;border-radius:24px 24px 0 0;width:100%;max-height:88vh;overflow-y:auto;">
+    <div style="display:flex;justify-content:center;padding:12px 0 0;"><div style="width:40px;height:4px;background:#ddd;border-radius:2px;"></div></div>
+    <div style="padding:16px 20px 48px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
+        <h2 style="font-size:20px;font-weight:800;color:#1a1a1a;">✏️ 기록 수정</h2>
+        <button onclick="closeEditModal()" style="background:#f0f0f0;border:none;border-radius:50%;width:36px;height:36px;font-size:18px;display:flex;align-items:center;justify-content:center;">✕</button>
+      </div>
+      <div id="edit-ok" style="display:none;background:#e8f5e9;border:2px solid #43a047;border-radius:16px;padding:40px;text-align:center;">
+        <div style="font-size:48px;margin-bottom:12px;">✅</div>
+        <div style="font-size:18px;font-weight:700;color:#2e7d32;">수정 완료!</div>
+      </div>
+      <div id="edit-body">
+        <div style="display:flex;border-radius:16px;overflow:hidden;margin-bottom:20px;border:2px solid #e0e0e0;background:white;">
+          <button id="edit-btn-out" onclick="setEditType('out')" style="flex:1;padding:14px;font-size:16px;font-weight:700;border:none;background:#ef5350;color:white;">📤 출고</button>
+          <button id="edit-btn-in"  onclick="setEditType('in')"  style="flex:1;padding:14px;font-size:16px;font-weight:700;border:none;background:white;color:#999;">📥 입고</button>
+        </div>
+        <div style="margin-bottom:14px;"><label class="form-label">부품번호</label><input id="edit-part" type="text" class="form-input" style="font-weight:700;color:#6B2D8B;letter-spacing:1px;text-transform:uppercase;" oninput="this.value=this.value.toUpperCase()"></div>
+        <div style="margin-bottom:14px;"><label class="form-label">Lot 번호 (선택)</label><input id="edit-lot" type="text" class="form-input" placeholder="Lot 번호 입력" style="text-transform:uppercase;" oninput="this.value=this.value.toUpperCase()"></div>
+        <div style="margin-bottom:14px;"><label class="form-label">수량</label><input id="edit-qty" type="number" min="1" class="form-input" inputmode="numeric" style="text-align:center;font-size:22px;font-weight:700;"></div>
+        <div style="margin-bottom:14px;"><label class="form-label">날짜</label><input id="edit-date" type="date" class="form-input"></div>
+        <div style="margin-bottom:20px;"><label class="form-label">비고</label><input id="edit-note" type="text" class="form-input" placeholder="메모 입력..."></div>
+        <div id="edit-info" style="background:#f3e5f5;border-radius:12px;padding:12px 16px;margin-bottom:20px;font-size:13px;color:#555;"></div>
+        <div id="edit-err" style="display:none;background:#ffebee;color:#c62828;padding:12px;border-radius:10px;margin-bottom:14px;font-size:14px;text-align:center;"></div>
+        <button id="edit-submit" onclick="submitEdit()" style="width:100%;padding:16px;font-size:17px;font-weight:800;background:linear-gradient(135deg,#6B2D8B,#8B44AA);color:white;border:none;border-radius:16px;">수정 저장</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ===================== 설정 =====================
+const FIREBASE_CONFIG = {
+  apiKey:            "AIzaSyA2h29j9T1is-3aRg3q3pVD4timODLB16s",
+  authDomain:        "inventory-ce8db.firebaseapp.com",
+  projectId:         "inventory-ce8db",
+  messagingSenderId: "781314959414",
+  appId:             "1:781314959414:web:d33057e74f91893b4ad097",
+  databaseURL:       "https://inventory-ce8db-default-rtdb.asia-southeast1.firebasedatabase.app"
+}
+
+const DEFAULT_EMPLOYEES = [
+  {name:'이병열',warehouseNumber:'SP60_01'},
+  {name:'최병권',warehouseNumber:'SP60_02'},
+  {name:'이희준',warehouseNumber:'SP60_03'},
+  {name:'곽동하',warehouseNumber:'SP60_04'},
+  {name:'최락훈',warehouseNumber:'SP60_05'},
+  {name:'김남우',warehouseNumber:'SP60_06'},
+  {name:'박성민',warehouseNumber:'SP60_07'},
+  {name:'박영근(QMR)',warehouseNumber:'SP60_08'},
+  {name:'김동현',warehouseNumber:'SP60_09'},
+  {name:'손성수',warehouseNumber:'SP60_10'},
+  {name:'윤건우',warehouseNumber:'SP60_11'},
+  {name:'김세영',warehouseNumber:'SP60_13'},
+  {name:'황석빈',warehouseNumber:'SP40_03'},
+  {name:'김진민',warehouseNumber:'SP50_02'},
+]
+
+const APP_PASSWORD = '65505'
+const ADMIN_NAME   = '관리자'
+
+// ===================== 상태 =====================
+let currentUser   = null
+let allTx         = []
+let filteredTx    = []
+let formType      = 'out'
+let partRows      = []          // [{part, lot, qty}]
+let scanTargetIdx = 0
+let scanner       = null
+let scanStarted   = false
+let editingTx     = null
+let EMPLOYEES     = []
+
+const todayISO = new Date().toISOString().split('T')[0]
+
+function getWeekStart() {
+  const d = new Date(), day = d.getDay()
+  d.setDate(d.getDate() - (day === 0 ? 6 : day - 1))
+  return d.toISOString().split('T')[0]
+}
+
+// ===================== Firebase =====================
+firebase.initializeApp(FIREBASE_CONFIG)
+const db = firebase.database()
+
+// ===================== 직원 목록 로드 =====================
+// ★ 수정: Firebase에 없으면 DEFAULT 저장, 있으면 그대로 읽기 (덮어쓰지 않음)
+async function loadEmployeeList() {
+  try {
+    const snap = await db.ref('employees').orderByChild('name').once('value')
+    if (snap.exists()) {
+      EMPLOYEES = []
+      snap.forEach(c => EMPLOYEES.push({id: c.key, ...c.val()}))
+      EMPLOYEES.sort((a,b) => a.name.localeCompare(b.name,'ko'))
+    } else {
+      // 최초 실행만 기본값 저장
+      const writes = DEFAULT_EMPLOYEES.map(e => db.ref('employees').push({name:e.name, warehouseNumber:e.warehouseNumber}))
+      await Promise.all(writes)
+      const snap2 = await db.ref('employees').orderByChild('name').once('value')
+      EMPLOYEES = []
+      snap2.forEach(c => EMPLOYEES.push({id: c.key, ...c.val()}))
+      EMPLOYEES.sort((a,b) => a.name.localeCompare(b.name,'ko'))
+    }
+  } catch(e) {
+    console.warn('직원 로드 실패, 기본값 사용:', e.message)
+    EMPLOYEES = DEFAULT_EMPLOYEES.map((e,i) => ({...e, id:'default_'+i}))
+  }
+}
+
+// ===================== 화면 전환 =====================
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'))
+  document.getElementById('screen-' + id).classList.add('active')
+  window.scrollTo(0,0)
+}
+
+// ===================== 로그인 =====================
+async function buildLoginSelect() {
+  await loadEmployeeList()
+  const sel = document.getElementById('login-name')
+  sel.innerHTML = '<option value="">-- 이름을 선택하세요 --</option>'
+  EMPLOYEES.forEach(e => {
+    const o = document.createElement('option'); o.value = e.name; o.textContent = e.name; sel.appendChild(o)
+  })
+  const ao = document.createElement('option'); ao.value = ADMIN_NAME; ao.textContent = '🛠 '+ADMIN_NAME+' (Admin)'; sel.appendChild(ao)
+  sel.onchange = () => {
+    const pw = document.getElementById('pw-wrap')
+    if (sel.value === ADMIN_NAME) { pw.style.display='block'; document.getElementById('login-pw').focus() }
+    else { pw.style.display='none'; document.getElementById('login-pw').value='' }
+  }
+  document.getElementById('login-pw').onkeydown = ev => { if(ev.key==='Enter') doLogin() }
+}
+buildLoginSelect()
+
+function doLogin() {
+  const name = document.getElementById('login-name').value
+  const pw   = document.getElementById('login-pw').value
+  const err  = document.getElementById('login-err')
+  err.style.display = 'none'
+  if (!name) return showErr(err,'이름을 선택해주세요.')
+  if (name === ADMIN_NAME) {
+    if (pw !== APP_PASSWORD) return showErr(err,'비밀번호가 올바르지 않습니다.')
+    currentUser = {name:ADMIN_NAME, isAdmin:true}
+    initAdmin(); showScreen('admin')
+  } else {
+    const emp = EMPLOYEES.find(e => e.name === name)
+    if (!emp) return showErr(err,'직원 정보를 찾을 수 없습니다.')
+    currentUser = {...emp, isAdmin:false}
+    initEmployee(); showScreen('employee')
+  }
+  document.getElementById('login-pw').value = ''
+}
+
+function showErr(el, msg) { el.textContent='⚠️ '+msg; el.style.display='block' }
+
+function doLogout() {
+  currentUser=null; allTx=[]; filteredTx=[]
+  document.getElementById('login-name').value=''
+  document.getElementById('login-pw').value=''
+  document.getElementById('login-err').style.display='none'
+  buildLoginSelect(); showScreen('login')
+}
+
+// ===================== 직원 화면 =====================
+function initEmployee() {
+  document.getElementById('emp-name').textContent = currentUser.name
+  document.getElementById('emp-wh').textContent   = '🏭 '+currentUser.warehouseNumber
+  loadEmpTx()
+}
+
+async function loadEmpTx() {
+  const el = document.getElementById('emp-list')
+  el.innerHTML = loadingHTML()
+  try {
+    const snap = await db.ref('transactions').orderByChild('employeeName').equalTo(currentUser.name).once('value')
+    const list = []
+    snap.forEach(c => list.push({id:c.key,...c.val()}))
+    list.sort((a,b) => b.timestamp - a.timestamp)
+    const todayQty = list.filter(t=>t.date===todayISO).reduce((s,t)=>s+(Number(t.quantity)||0),0)
+    document.getElementById('today-cnt').textContent = todayQty
+    el.innerHTML = list.length===0 ? emptyHTML('기록이 없습니다','위 버튼을 눌러 첫 기록을 남겨보세요') : list.slice(0,30).map(txCard).join('')
+  } catch(e) { el.innerHTML = errHTML(e.message) }
+}
+
+function txCard(tx) {
+  const out = tx.type==='out'
+  const ts  = tx.timestamp ? new Date(tx.timestamp).toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit'}) : ''
+  return `<div style="background:white;border-radius:16px;padding:16px;margin-bottom:10px;border-left:4px solid ${out?'#ef5350':'#43a047'};box-shadow:0 2px 8px rgba(0,0,0,0.06);">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+      <div style="flex:1;min-width:0;">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
+          <span class="${out?'tag-out':'tag-in'}">${out?'📤 출고':'📥 입고'}</span>
+          <button onclick="openEditModal('${tx.id}')" style="padding:2px 10px;background:#f3e5f5;color:#6B2D8B;border:none;border-radius:12px;font-size:12px;font-weight:700;">✏️ 수정</button>
+        </div>
+        <div style="font-size:18px;font-weight:800;color:#6B2D8B;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${tx.partNumber}</div>
+        ${tx.lotNumber?`<div style="font-size:12px;color:#7B3BA0;margin-top:3px;font-weight:600;">🏷 Lot: ${tx.lotNumber}</div>`:''}
+        ${tx.note?`<div style="font-size:13px;color:#888;margin-top:4px;">💬 ${tx.note}</div>`:''}
+      </div>
+      <div style="text-align:right;flex-shrink:0;margin-left:12px;">
+        <div style="font-size:22px;font-weight:800;color:${out?'#ef5350':'#43a047'};">${tx.quantity}<span style="font-size:14px;">개</span></div>
+        <div style="font-size:11px;color:#bbb;">${tx.date}</div>
+        ${ts?`<div style="font-size:11px;color:#bbb;">${ts}</div>`:''}
+      </div>
+    </div>
+  </div>`
+}
+
+// ===================== 출입고 폼 =====================
+function openForm() {
+  formType = 'out'
+  partRows = [{part:'',lot:'',qty:''}]
+  document.getElementById('f-note').value = ''
+  document.getElementById('f-err').style.display    = 'none'
+  document.getElementById('form-ok').style.display   = 'none'
+  document.getElementById('form-body').style.display = 'block'
+  refreshFormType(); refreshFormInfo(); renderPartRows()
+  document.getElementById('form-modal').style.display = 'flex'
+}
+
+function closeForm() { document.getElementById('form-modal').style.display='none' }
+
+// ★ 수정: 추가 전 DOM 동기화 후 push
+function addPartRow() {
+  syncDOM()
+  partRows.push({part:'',lot:'',qty:''})
+  renderPartRows()
+  // 새 행 부품번호에 포커스
+  setTimeout(() => {
+    const inputs = document.querySelectorAll('#parts-list .part-input')
+    if (inputs.length) inputs[inputs.length-1].focus()
+  }, 30)
+}
+
+function removePartRow(idx) {
+  syncDOM()
+  partRows.splice(idx,1)
+  renderPartRows()
+}
+
+// ★ 핵심: DOM → partRows 동기화 (저장 전·추가 전·삭제 전 항상 호출)
+function syncDOM() {
+  partRows.forEach((row,i) => {
+    const p = document.getElementById('p-part-'+i)
+    const l = document.getElementById('p-lot-'+i)
+    const q = document.getElementById('p-qty-'+i)
+    if(p) row.part = p.value.trim().toUpperCase()
+    if(l) row.lot  = l.value.trim().toUpperCase()
+    if(q) row.qty  = q.value
+  })
+}
+
+// ★ 수정: id를 p-part-N / p-lot-N / p-qty-N 으로 통일, oninput 제거
+function renderPartRows() {
+  const c = document.getElementById('parts-list')
+  if (!c) return
+  c.innerHTML = partRows.map((row,i) => `
+    <div style="background:white;border-radius:14px;padding:14px;margin-bottom:10px;box-shadow:0 2px 8px rgba(0,0,0,0.06);border:1.5px solid #e8e8e8;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+        <span style="font-size:13px;font-weight:700;color:#6B2D8B;background:#f3e5f5;padding:3px 10px;border-radius:20px;">부품 ${i+1}</span>
+        ${partRows.length>1
+          ?`<button type="button" onclick="removePartRow(${i})" style="background:#ffebee;color:#c62828;border:none;border-radius:8px;padding:4px 10px;font-size:13px;font-weight:700;">✕ 삭제</button>`
+          :''}
+      </div>
+      <div style="display:flex;gap:8px;margin-bottom:8px;">
+        <input id="p-part-${i}" type="text" class="part-input form-input"
+          placeholder="부품번호 스캔 또는 입력"
+          value="${esc(row.part)}"
+          style="flex:1;font-weight:700;color:#6B2D8B;letter-spacing:1px;padding:12px 14px;text-transform:uppercase;">
+        <button type="button" onclick="openScanner(${i})"
+          style="padding:12px 14px;background:linear-gradient(135deg,#6B2D8B,#8B44AA);color:white;border:none;border-radius:12px;font-size:20px;">📷</button>
+      </div>
+      <input id="p-lot-${i}" type="text" class="form-input"
+        placeholder="Lot 번호 (선택)"
+        value="${esc(row.lot||'')}"
+        style="margin-bottom:8px;font-weight:600;color:#555;text-transform:uppercase;">
+      <input id="p-qty-${i}" type="number" class="form-input"
+        placeholder="수량" min="1" inputmode="numeric"
+        value="${esc(row.qty)}"
+        style="text-align:center;font-size:20px;font-weight:700;padding:12px;">
+    </div>`).join('')
+}
+
+function esc(s){ return String(s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;') }
+
+function setType(t) { formType=t; refreshFormType(); refreshFormInfo() }
+
+function refreshFormType() {
+  const isOut = formType==='out'
+  const ob=document.getElementById('btn-out'), ib=document.getElementById('btn-in'), sb=document.getElementById('f-submit')
+  ob.style.background=isOut?'#ef5350':'white'; ob.style.color=isOut?'white':'#999'
+  ib.style.background=isOut?'white':'#43a047'; ib.style.color=isOut?'#999':'white'
+  sb.style.background=isOut?'linear-gradient(135deg,#ef5350,#e53935)':'linear-gradient(135deg,#43a047,#388e3c)'
+  sb.textContent=isOut?'📤 출고 기록 저장':'📥 입고 기록 저장'
+}
+
+function refreshFormInfo() {
+  document.getElementById('f-info').innerHTML=`
+    <div style="display:flex;justify-content:space-between;margin-bottom:6px;"><span style="color:#666;">👤 ${formType==='out'?'출고자':'입고자'}</span><strong style="color:#6B2D8B;">${currentUser.name}</strong></div>
+    <div style="display:flex;justify-content:space-between;margin-bottom:6px;"><span style="color:#666;">🏭 창고번호</span><strong style="color:#6B2D8B;">${currentUser.warehouseNumber}</strong></div>
+    <div style="display:flex;justify-content:space-between;"><span style="color:#666;">📅 날짜</span><strong style="color:#6B2D8B;">${todayISO}</strong></div>`
+}
+
+async function submitForm() {
+  syncDOM()   // ★ 저장 직전 최종 동기화
+  const note  = document.getElementById('f-note').value.trim()
+  const errEl = document.getElementById('f-err')
+  const subB  = document.getElementById('f-submit')
+  errEl.style.display='none'
+
+  for (let i=0;i<partRows.length;i++) {
+    const r=partRows[i]
+    if (!r.part) return showFErr(`부품 ${i+1}: 부품번호를 입력해주세요.`)
+    if (!r.qty || Number(r.qty)<1) return showFErr(`부품 ${i+1}: 수량을 올바르게 입력해주세요.`)
+  }
+
+  subB.disabled=true; subB.textContent=`저장 중... (0/${partRows.length})`
+  try {
+    for (let i=0;i<partRows.length;i++) {
+      const r=partRows[i]
+      await db.ref('transactions').push({
+        employeeName:    currentUser.name,
+        warehouseNumber: currentUser.warehouseNumber,
+        partNumber:      r.part,
+        lotNumber:       r.lot||'',
+        quantity:        Number(r.qty),
+        type:            formType,
+        date:            todayISO,
+        note:            note,
+        timestamp:       firebase.database.ServerValue.TIMESTAMP,
+      })
+      subB.textContent=`저장 중... (${i+1}/${partRows.length})`
+    }
+    document.getElementById('form-ok-msg').textContent = `${partRows.length}개 부품 저장 완료!`
+    document.getElementById('form-ok').style.display   = 'block'
+    document.getElementById('form-body').style.display = 'none'
+    setTimeout(() => { closeForm(); currentUser.isAdmin ? loadAdminTx() : loadEmpTx() }, 1400)
+  } catch(e) {
+    showFErr('저장 오류: '+e.message)
+    subB.disabled=false; refreshFormType()
+  }
+}
+
+function showFErr(msg) { const e=document.getElementById('f-err'); e.textContent='⚠️ '+msg; e.style.display='block' }
+
+// ===================== 스캐너 =====================
+function openScanner(idx) {
+  scanTargetIdx=idx
+  document.getElementById('scan-err').style.display='none'
+  document.getElementById('qr-reader').innerHTML=''
+  document.getElementById('scan-modal').style.display='flex'
+  setTimeout(async()=>{
+    try {
+      scanner=new Html5Qrcode('qr-reader')
+      await scanner.start({facingMode:'environment'},{fps:10,qrbox:{width:260,height:90}},
+        (text)=>{
+          const input=document.getElementById('p-part-'+scanTargetIdx)
+          if(input) input.value=text.toUpperCase()
+          if(partRows[scanTargetIdx]) partRows[scanTargetIdx].part=text.toUpperCase()
+          closeScanner()
+        },()=>{})
+      scanStarted=true
+    } catch(e) {
+      const el=document.getElementById('scan-err'); el.style.display='block'
+      el.textContent='카메라 접근 불가: '+e.message+'\n\n부품번호를 직접 입력해주세요.'
+    }
+  },150)
+}
+
+async function closeScanner() {
+  if(scanner&&scanStarted){ try{await scanner.stop()}catch(_){} scanStarted=false }
+  scanner=null
+  document.getElementById('qr-reader').innerHTML=''
+  document.getElementById('scan-modal').style.display='none'
+}
+
+// ===================== 관리자 =====================
+function initAdmin() {
+  rebuildEmpFilter()
+  loadAdminTx()
+}
+
+function rebuildEmpFilter() {
+  const sel=document.getElementById('f-emp')
+  if(!sel) return
+  sel.innerHTML='<option value="">전체 직원</option>'
+  EMPLOYEES.forEach(e=>{ const o=document.createElement('option'); o.value=e.name; o.textContent=e.name; sel.appendChild(o) })
+}
+
+async function loadAdminTx() {
+  document.getElementById('admin-list').innerHTML=loadingHTML()
+  try {
+    const snap=await db.ref('transactions').orderByChild('timestamp').once('value')
+    const list=[]; snap.forEach(c=>list.push({id:c.key,...c.val()}))
+    allTx=list.sort((a,b)=>b.timestamp-a.timestamp)
+    updateStats(); applyFilters(); renderEmpStats()
+  } catch(e){ document.getElementById('admin-list').innerHTML=errHTML(e.message) }
+}
+
+function updateStats() {
+  const ws=getWeekStart()
+  const todayL=allTx.filter(t=>t.date===todayISO)
+  const weekL =allTx.filter(t=>t.date>=ws)
+  const active=new Set(todayL.map(t=>t.employeeName))
+  const miss  =EMPLOYEES.filter(e=>!active.has(e.name))
+  document.getElementById('stat-today').innerHTML=`<div style="font-size:24px;font-weight:800;color:white;">${todayL.length}</div><div style="font-size:11px;opacity:.75;">오늘 건수</div>`
+  document.getElementById('stat-week').innerHTML =`<div style="font-size:24px;font-weight:800;color:white;">${weekL.length}</div><div style="font-size:11px;opacity:.75;">이번 주</div>`
+  const mc=miss.length>0?'#ffcc02':'white', mb=miss.length>0?'rgba(255,160,0,0.25)':'rgba(255,255,255,0.15)'
+  const sm=document.getElementById('stat-miss'); sm.style.background=mb
+  sm.innerHTML=`<div style="font-size:24px;font-weight:800;color:${mc};">${miss.length}</div><div style="font-size:11px;opacity:.75;">미제출 인원</div>`
+  document.getElementById('wk-cnt').textContent=weekL.length+'건 다운로드'
+}
+
+function applyFilters() {
+  const emp=document.getElementById('f-emp').value, type=document.getElementById('f-type').value
+  const from=document.getElementById('f-from').value, to=document.getElementById('f-to').value
+  filteredTx=allTx.filter(tx=>{
+    if(emp&&tx.employeeName!==emp)return false
+    if(type&&tx.type!==type)return false
+    if(from&&tx.date<from)return false
+    if(to&&tx.date>to)return false
+    return true
+  })
+  document.getElementById('res-cnt').textContent='총 '+filteredTx.length+'건'
+  document.getElementById('fl-cnt').textContent=filteredTx.length+'건 다운로드'
+  renderAdminList()
+}
+
+function clearFilters() {
+  ['f-emp','f-type','f-from','f-to'].forEach(id=>{ document.getElementById(id).value='' })
+  applyFilters()
+}
+
+function renderAdminList() {
+  const el=document.getElementById('admin-list')
+  if(!filteredTx.length){ el.innerHTML=emptyHTML('해당 조건의 기록이 없습니다','필터를 변경해보세요'); return }
+  el.innerHTML=filteredTx.map(tx=>{
+    const out=tx.type==='out'
+    const ts=tx.timestamp?new Date(tx.timestamp).toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit'}):''
+    return `<div style="background:white;border-radius:14px;padding:14px 16px;margin-bottom:8px;border-left:4px solid ${out?'#ef5350':'#43a047'};box-shadow:0 2px 6px rgba(0,0,0,0.05);">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+        <div style="flex:1;min-width:0;">
+          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:5px;">
+            <span class="${out?'tag-out':'tag-in'}">${out?'📤 출고':'📥 입고'}</span>
+            <button onclick="openEditModal('${tx.id}')" style="padding:2px 10px;background:#f3e5f5;color:#6B2D8B;border:none;border-radius:12px;font-size:12px;font-weight:700;">✏️ 수정</button>
+          </div>
+          <div style="font-size:16px;font-weight:800;color:#6B2D8B;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${tx.partNumber}</div>
+          ${tx.lotNumber?`<div style="font-size:12px;color:#7B3BA0;margin-top:2px;font-weight:600;">🏷 Lot: ${tx.lotNumber}</div>`:''}
+          <div style="font-size:13px;color:#666;margin-top:3px;">👤 ${tx.employeeName} &nbsp;·&nbsp; 🏭 ${tx.warehouseNumber}</div>
+          ${tx.note?`<div style="font-size:12px;color:#aaa;margin-top:2px;">💬 ${tx.note}</div>`:''}
+        </div>
+        <div style="text-align:right;flex-shrink:0;margin-left:12px;">
+          <div style="font-size:20px;font-weight:800;color:${out?'#ef5350':'#43a047'};">${tx.quantity}<span style="font-size:13px;">개</span></div>
+          <div style="font-size:11px;color:#bbb;">${tx.date}</div>
+          ${ts?`<div style="font-size:11px;color:#bbb;">${ts}</div>`:''}
+        </div>
+      </div>
+    </div>`
+  }).join('')
+}
+
+function renderEmpStats() {
+  const ws=getWeekStart(), weekTx=allTx.filter(t=>t.date>=ws)
+  const active=new Set(allTx.filter(t=>t.date===todayISO).map(t=>t.employeeName))
+  const missing=EMPLOYEES.filter(e=>!active.has(e.name))
+  const ma=document.getElementById('miss-alert')
+  if(missing.length>0){
+    ma.style.display='block'
+    document.getElementById('miss-title').textContent=`⚠️ 오늘 미기록 인원 (${missing.length}명)`
+    document.getElementById('miss-list').innerHTML=missing.map(e=>`<span style="background:#fff3e0;border:1px solid #ffcc02;padding:4px 12px;border-radius:20px;font-size:13px;color:#e65100;font-weight:600;">${e.name}</span>`).join('')
+  } else { ma.style.display='none' }
+  const stats=EMPLOYEES.map(emp=>{
+    const etx=weekTx.filter(t=>t.employeeName===emp.name)
+    return {name:emp.name,wh:emp.warehouseNumber,cnt:etx.length,out:etx.filter(t=>t.type==='out').length,in:etx.filter(t=>t.type==='in').length,today:active.has(emp.name)}
+  }).sort((a,b)=>b.cnt-a.cnt)
+  document.getElementById('emp-stats').innerHTML=stats.map(s=>`
+    <div style="background:white;border-radius:14px;padding:14px 16px;margin-bottom:10px;box-shadow:0 2px 8px rgba(0,0,0,0.05);border-left:4px solid ${s.today?'#43a047':'#e0e0e0'};">
+      <div style="display:flex;justify-content:space-between;align-items:center;">
+        <div>
+          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+            <span style="font-size:16px;font-weight:700;">${s.name}</span>
+            <span style="font-size:11px;background:${s.today?'#e8f5e9':'#f5f5f5'};color:${s.today?'#2e7d32':'#999'};padding:2px 8px;border-radius:10px;font-weight:600;">${s.today?'오늘 기록 ✓':'오늘 미기록'}</span>
+          </div>
+          <div style="font-size:12px;color:#888;margin-top:3px;">${s.wh}</div>
+        </div>
+        <div style="text-align:right;">
+          <div style="font-size:20px;font-weight:800;color:#6B2D8B;">${s.cnt}건</div>
+          <div style="font-size:12px;color:#888;">출고 ${s.out} · 입고 ${s.in}</div>
+        </div>
+      </div>
+    </div>`).join('')
+}
+
+function switchTab(tab) {
+  ['list','stats','emp'].forEach(t=>{
+    document.getElementById('tab-'+t).style.display = t===tab?'block':'none'
+    const b=document.getElementById('tb-'+t)
+    b.style.borderBottom=t===tab?'3px solid #6B2D8B':'3px solid transparent'
+    b.style.color=t===tab?'#6B2D8B':'#999'
+    b.style.background=t===tab?'white':'#fafafa'
+  })
+  if(tab==='emp') loadEmployees()
+  if(tab==='stats') renderEmpStats()
+}
+
+// ===================== 직원 관리 =====================
+async function loadEmployees() {
+  const el=document.getElementById('emp-mgmt-list')
+  el.innerHTML=loadingHTML()
+  try {
+    const snap=await db.ref('employees').once('value')
+    EMPLOYEES=[]
+    snap.forEach(c=>EMPLOYEES.push({id:c.key,...c.val()}))
+    EMPLOYEES.sort((a,b)=>a.name.localeCompare(b.name,'ko'))
+    document.getElementById('emp-cnt').textContent=EMPLOYEES.length
+    rebuildEmpFilter()
+
+    if(!EMPLOYEES.length){ el.innerHTML=emptyHTML('직원이 없습니다','위 양식으로 직원을 추가해주세요'); return }
+    el.innerHTML=EMPLOYEES.map(emp=>`
+      <div style="background:white;border-radius:14px;padding:14px 16px;margin-bottom:8px;box-shadow:0 2px 8px rgba(0,0,0,0.06);display:flex;justify-content:space-between;align-items:center;">
+        <div>
+          <div style="font-size:16px;font-weight:700;color:#1a1a1a;">${emp.name}</div>
+          <div style="font-size:13px;color:#6B2D8B;margin-top:2px;font-weight:600;">🏭 ${emp.warehouseNumber}</div>
+        </div>
+        <button onclick="deleteEmployee('${emp.id}','${emp.name}')" style="background:#ffebee;color:#c62828;border:none;border-radius:10px;padding:8px 16px;font-size:13px;font-weight:700;">🗑 삭제</button>
+      </div>`).join('')
+  } catch(e){ el.innerHTML=errHTML(e.message) }
+}
+
+// ★ 수정: 버튼 비활성화/재활성화 처리, 성공 메시지 표시
+async function addEmployee() {
+  const nameEl=document.getElementById('new-emp-name')
+  const whEl  =document.getElementById('new-emp-wh')
+  const errEl =document.getElementById('add-emp-err')
+  const okEl  =document.getElementById('add-emp-ok')
+  const btn   =document.getElementById('btn-add-emp')
+  const name  =nameEl.value.trim()
+  const wh    =whEl.value.trim().toUpperCase()
+
+  errEl.style.display='none'; okEl.style.display='none'
+  if(!name){ errEl.textContent='⚠️ 이름을 입력해주세요.'; errEl.style.display='block'; return }
+  if(!wh)  { errEl.textContent='⚠️ 창고번호를 입력해주세요.'; errEl.style.display='block'; return }
+
+  // 중복 체크 (최신 목록 기준)
+  const snap=await db.ref('employees').orderByChild('name').equalTo(name).once('value')
+  if(snap.exists()){ errEl.textContent='⚠️ 이미 존재하는 이름입니다.'; errEl.style.display='block'; return }
+
+  btn.disabled=true; btn.textContent='저장 중...'
+  try {
+    await db.ref('employees').push({name, warehouseNumber:wh})
+    nameEl.value=''; whEl.value=''
+    okEl.textContent=`✅ "${name}" 직원이 추가되었습니다.`
+    okEl.style.display='block'
+    setTimeout(()=>{ okEl.style.display='none' }, 2500)
+    loadEmployees()
+  } catch(e){
+    errEl.textContent='⚠️ 저장 오류: '+e.message; errEl.style.display='block'
+  } finally {
+    btn.disabled=false; btn.textContent='직원 추가'
+  }
+}
+
+async function deleteEmployee(id, name) {
+  if(!confirm(`"${name}" 직원을 삭제하시겠습니까?\n\n(기록 데이터는 삭제되지 않습니다)`)) return
+  try {
+    await db.ref('employees/'+id).remove()
+    loadEmployees()
+  } catch(e){ alert('삭제 오류: '+e.message) }
+}
+
+// ===================== Excel =====================
+function toRows(list){ return list.map(tx=>({'날짜':tx.date,'직원명':tx.employeeName,'창고번호':tx.warehouseNumber,'부품번호':tx.partNumber,'Lot 번호':tx.lotNumber||'','수량':tx.quantity,'구분':tx.type==='out'?'출고':'입고','비고':tx.note||''})) }
+function doExport(list,fname){
+  if(!list.length){ alert('내보낼 데이터가 없습니다.'); return }
+  const ws=XLSX.utils.json_to_sheet(toRows(list)); ws['!cols']=[{wch:12},{wch:10},{wch:12},{wch:22},{wch:16},{wch:8},{wch:8},{wch:20}]
+  const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,'출입고 기록'); XLSX.writeFile(wb,fname)
+}
+function exportWeekly()  { doExport(allTx.filter(t=>t.date>=getWeekStart()),`파츠_주간보고_${todayISO}.xlsx`) }
+function exportFiltered(){ doExport(filteredTx,`파츠_출입고_${todayISO}.xlsx`) }
+
+// ===================== 수정 모달 =====================
+function openEditModal(txId) {
+  db.ref('transactions/'+txId).once('value').then(snap=>{
+    if(!snap.exists()){ alert('기록을 찾을 수 없습니다.'); return }
+    editingTx={id:txId,...snap.val()}
+    setEditType(editingTx.type||'out')
+    document.getElementById('edit-part').value = editingTx.partNumber||''
+    document.getElementById('edit-lot').value  = editingTx.lotNumber ||''
+    document.getElementById('edit-qty').value  = editingTx.quantity  ||''
+    document.getElementById('edit-date').value = editingTx.date      ||''
+    document.getElementById('edit-note').value = editingTx.note      ||''
+    document.getElementById('edit-info').innerHTML=`
+      <div style="display:flex;justify-content:space-between;margin-bottom:4px;"><span>👤 담당자</span><strong style="color:#6B2D8B;">${editingTx.employeeName}</strong></div>
+      <div style="display:flex;justify-content:space-between;"><span>🏭 창고번호</span><strong style="color:#6B2D8B;">${editingTx.warehouseNumber}</strong></div>`
+    document.getElementById('edit-ok').style.display   ='none'
+    document.getElementById('edit-body').style.display ='block'
+    document.getElementById('edit-err').style.display  ='none'
+    document.getElementById('edit-modal').style.display='flex'
+  }).catch(e=>alert('불러오기 오류: '+e.message))
+}
+
+function closeEditModal(){ document.getElementById('edit-modal').style.display='none'; editingTx=null }
+
+function setEditType(t) {
+  if(!editingTx) editingTx={}
+  editingTx._editType=t
+  const ob=document.getElementById('edit-btn-out'), ib=document.getElementById('edit-btn-in')
+  ob.style.background=t==='out'?'#ef5350':'white'; ob.style.color=t==='out'?'white':'#999'
+  ib.style.background=t==='in' ?'#43a047':'white'; ib.style.color=t==='in' ?'white':'#999'
+}
+
+async function submitEdit() {
+  const part =document.getElementById('edit-part').value.trim().toUpperCase()
+  const lot  =document.getElementById('edit-lot').value.trim().toUpperCase()
+  const qty  =Number(document.getElementById('edit-qty').value)
+  const date =document.getElementById('edit-date').value
+  const note =document.getElementById('edit-note').value.trim()
+  const type =editingTx._editType||editingTx.type||'out'
+  const errEl=document.getElementById('edit-err')
+  errEl.style.display='none'
+  if(!part)       { errEl.textContent='⚠️ 부품번호를 입력해주세요.'; errEl.style.display='block'; return }
+  if(!qty||qty<1) { errEl.textContent='⚠️ 수량을 올바르게 입력해주세요.'; errEl.style.display='block'; return }
+  if(!date)       { errEl.textContent='⚠️ 날짜를 선택해주세요.'; errEl.style.display='block'; return }
+  const subB=document.getElementById('edit-submit'); subB.disabled=true; subB.textContent='저장 중...'
+  try {
+    await db.ref('transactions/'+editingTx.id).update({partNumber:part,lotNumber:lot,quantity:qty,type,date,note})
+    document.getElementById('edit-ok').style.display  ='block'
+    document.getElementById('edit-body').style.display='none'
+    setTimeout(()=>{ closeEditModal(); currentUser&&currentUser.isAdmin?loadAdminTx():loadEmpTx() },1200)
+  } catch(e){
+    errEl.textContent='⚠️ 저장 오류: '+e.message; errEl.style.display='block'
+    subB.disabled=false; subB.textContent='수정 저장'
+  }
+}
+
+// ===================== UI 헬퍼 =====================
+const loadingHTML = () => `<div style="text-align:center;padding:60px;color:#999;"><div style="font-size:36px;margin-bottom:12px;">⏳</div>불러오는 중...</div>`
+const emptyHTML   = (t,s) => `<div style="text-align:center;padding:60px;background:white;border-radius:16px;color:#999;"><div style="font-size:48px;margin-bottom:12px;">📋</div><div style="font-size:16px;font-weight:600;margin-bottom:8px;">${t}</div><div style="font-size:14px;">${s}</div></div>`
+const errHTML     = m => `<div style="text-align:center;padding:40px;color:#c62828;background:white;border-radius:16px;">⚠️ 데이터를 불러오지 못했습니다.<br><small style="color:#999;">${m}</small></div>`
+</script>
+</body>
+</html>
