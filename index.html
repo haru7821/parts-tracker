@@ -1,0 +1,53 @@
+<html>
+<head>
+    <title>Parts Tracker</title>
+    <style>
+        body {
+            background-color: #FFFAEB; /* cream color */
+            color: #72256B; /* dark purple */
+        }
+        .success {
+            color: #6CA07A; /* green */
+        }
+        .secondary {
+            color: #CDDFD7; /* light green */
+        }
+        .dark {
+            color: #105742; /* dark green */
+        }
+        .overdue-warning {
+            background-color: yellow; /* default for overdue */
+        }
+        .overdue-warning[data-overdue='30'] {
+            background-color: orange; /* 30 days overdue */
+        }
+        .overdue-warning[data-overdue='60'] {
+            background-color: red; /* 60 days overdue */
+        }
+        .status-badge {
+            display: inline-block;
+            padding: 5px;
+            border-radius: 3px;
+        }
+        .badge-in-progress {
+            background-color: #FFD700; /* gold for 진행중 */
+            color: white;
+        }
+        .badge-completed {
+            background-color: #4CAF50; /* green for 완료 */
+            color: white;
+        }
+    </style>
+</head>
+<body>
+    <h1>Parts Tracker</h1>
+    <div class="status">
+        <span class="status-badge badge-in-progress">진행중</span>
+        <span class="status-badge badge-completed">완료</span>
+    </div>
+    <div class="overdue-warning" data-overdue="30">This part is 30 days overdue!</div>
+    <div class="overdue-warning" data-overdue="60">This part is 60 days overdue!</div>
+    <div class="overdue-warning">This part is not overdue.</div>
+    <!-- Existing functionality code goes here -->
+</body>
+</html>
